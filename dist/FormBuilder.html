@@ -18,6 +18,318 @@
         <button class="button" onclick='AddInput()'>Add Input</button>
         
         
-        <script type="text/javascript" src="main.js"></script>
+<script>
+var app = app || {};
+app.db = '';
+app.counter = 0;
+app.condtype;
+var ElementFrame = ElementFrame || {};
+            ElementFrame.SelectType = '<select><option value="1">Text</option><option value="2">Number</option><option value="3">Yes/NO</option></select>';
+            ElementFrame.QuestionLabel = '<label>Question</label>';
+            ElementFrame.ConditionLabel = '<label>Condition</label>';
+            ElementFrame.TypeLabel = '<label>Type</label>';
+            ElementFrame.Buttons = '<button class="nav-right"';
+            ElementFrame.SelectConditionType = '<select><option value="1">Text</option><option value="2">Number</option><option value="3">Yes/NO</option></select>';
+var Inputs = [];
+            
+            
+function Input(number, parent, InputType, Condition, ConditionType){
+                this.number = number;
+                this.parent = parent;
+                this.InputType = InputType;
+                this.question = '';
+                this.type = 1;
+                this.Condition = '';
+                this.ConditionType = 1;
+}
+
+function openDB(){
+    var DBOpenRequest = window.indexedDB.open('inputs', 8);
+    DBOpenRequest.onerror = function(){
+        alert('Error while opening database! '+ event.target.errorCode);
+    }
+    DBOpenRequest.onsuccess = function(){
+        app.db = DBOpenRequest.result;
+        display();
+    }
+    
+    DBOpenRequest.onupgradeneeded = function(event){
+        if(event.oldVersion < 6){
+            app.db = DBOpenRequest.result;
+            var db = app.db;
+            var objectStore = db.createObjectStore('inputs', { keyPath: 'number' } );
+            objectStore.createIndex('parent','parent', { unique : false } );
+            objectStore.createIndex('InputType','InputType', { unique : false } );
+            objectStore.createIndex('question','question', { unique : false } );
+            objectStore.createIndex('type','type', { unique : false } );
+            objectStore.createIndex('Condition','Condition', { unique : false } );
+            objectStore.createIndex('ConditionType','ConditionType', { unique : false } );
+        }
+        var db = event.target.result;
+        db.onerror = function(event){
+            alert('error');
+        }  
+    }
+}
+
+Input.prototype.Create = function(){
+    var data = this;
+    var number = app.counter;
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var objectstore = transaction.objectStore('inputs');
+    var objectStoreRequest = objectstore.add(this);
+    objectStoreRequest.onsuccess = function(){
+        dsp(number, data);  
+    }            
+}
+            
+function AddInput(){
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var objectstore = transaction.objectStore('inputs');
+    var requestSecond = objectstore.getAll();
+    requestSecond.onsuccess = function(){
+        var objCnt = requestSecond.result.length;
+        if(objCnt> 1){
+            app.counter = requestSecond.result[objCnt-1].number;
+        }
+    }
+    app.counter++;
+    parent = 'form';
+    InputType = 'normal';
+    Inputs[app.counter] = new Input(app.counter, parent, InputType);
+    Inputs[app.counter].Create();        
+}
+            
+function AddSubInput(parent){
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var objectstore = transaction.objectStore('inputs');
+    var requestSecond = objectstore.getAll();
+    requestSecond.onsuccess = function(){
+        var objCnt = requestSecond.result.length;
+        app.counter = requestSecond.result[objCnt-1].number;
+        app.counter++;
+        InputType = 'sub';
+        Inputs[app.counter] = new Input(app.counter, parent.id, InputType);
+        Inputs[app.counter].Create();
+    }  
+}
+            
+function DeleteInput(identifier){
+    var objId = identifier.id;
+    var objNum = objId.split('_');
+    var element = document.getElementById(objId);
+    element.parentNode.removeChild(element);
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var objectstore = transaction.objectStore('inputs');
+    var delObj = objectstore.delete(parseInt(objNum[1]));
+
+    var objToRem = objId;
+    searchChildren(objToRem);
+    function searchChildren(objToRem){
+        var request = objectstore.getAll();
+        request.onsuccess = function(){
+            app.counter = request.result.length;            
+            var data = request.result;
+            for(var z = 0; z < data.length; z++){
+                checkForChild(z, data, objToRem);    
+            }
+        }               
+    }
+    function checkForChild(z, data, objToRem){                  
+        if(data[z].parent == objToRem){
+            var newNum = data[z].number;
+            objToRem = 'sub_'+newNum;
+            var del2 = objectstore.delete(parseInt(newNum));
+            searchChildren(objToRem);           
+        }
+    }            
+}
+            
+function display(){
+    var db = app.db;
+    var transaction = db.transaction(['inputs'], 'readonly');
+    var objectstore = transaction.objectStore('inputs');
+    var request = objectstore.getAll();
+    request.onsuccess = function(){
+        app.counter = request.result.length; 
+        var data = request.result;
+        for(var z = 0; z < data.length; z++){
+            var number = parseInt(data[z].number);
+            dsp(number, data[z]);   
+        }
+    }                
+}
+
+function dsp(number, data){
+    if(number >= app.counter){
+        app.counter = number;
+    }
+    var is = '';
+        
+    if(data.InputType == "normal"){
+        var tag = 'input_'+number;
+    }else if(data.InputType == "sub"){
+        var tag = 'sub_'+number;
+        var p = data.parent;
+        var l = p.split('_');
+                            
+        UpdateConditionType(number, l[1]);
+    
+    }
+    is += '<p>'+ElementFrame.QuestionLabel+'<input onfocusout="UpdateQuestion('+number+')" value="'+data.question+'"></p>';
+    is += '<p>'+ElementFrame.TypeLabel;
+    is += '<select onchange="UpdateSelect(this, '+number+')">';
+    
+    switch(data.type){
+        case 1: 
+            is += '<option value="1" selected>Text</option><option value="2">Number</option><option value="3">Yes/NO</option>';
+            break;
+        case 2:
+            is += '<option value="1">Text</option><option value="2" selected>Number</option><option value="3">Yes/NO</option>';
+            break;
+        case 3:
+            is += '<option value="1">Text</option><option value="2">Number</option><option value="3" selected>Yes/NO</option>';
+            break;
+    }
+    is += '</select>';
+    var element = '<div class="block" id="'+tag+'"><div class="x">'+is+'</p>'+ElementFrame.Buttons+'onclick="AddSubInput('+tag+')">Add Sub-Input</button>'+ElementFrame.Buttons+' onclick="DeleteInput('+tag+')">Delete</button></div></div>';
+    document.getElementById(data.parent).insertAdjacentHTML('beforeend',element);
+}
+
+ function UpdateQuestion(number){
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var objVal = event.target.value;
+    var objectstore = transaction.objectStore('inputs');
+    var objectStoreRequest = objectstore.get(number);
+    objectStoreRequest.onsuccess = function(){
+        var x = objectStoreRequest.result;
+        x.question = objVal;
+        var update = objectstore.put(x);
+    }
+ }
+
+function UpdateSelect(select, number){
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var selVal = select.value;
+    var objectstore = transaction.objectStore('inputs');
+    var objectStoreRequest = objectstore.get(number);
+    objectStoreRequest.onsuccess = function(){
+        var x = objectStoreRequest.result;             
+        x.type = parseInt(selVal);
+        if(x.InputType == "normal"){
+           var elem = document.getElementById("input_"+number);
+        }else{
+            var elem = document.getElementById("sub_"+number);
+        }
+        var childs = elem.childNodes;
+        var update = objectstore.put(x);
+        for(var noOfChilds = 1; noOfChilds < childs.length; noOfChilds++){
+            var currChild = childs[noOfChilds];
+            var currId = currChild.id;
+            var currNo = currId.split('_');
+            var removeOldSelect = document.getElementById(currId).getElementsByTagName('div')[0];
+            removeOldSelect.removeChild(removeOldSelect.childNodes[0]);
+            var objectStoreRequestSecond = objectstore.get(parseInt(currNo[1]));
+            objectStoreRequestSecond.onsuccess = function(){
+                var override = objectStoreRequestSecond.result;
+                override.Condition = "";
+                override.ConditionType = 1;
+                var update = objectstore.put(override);
+                UpdateConditionType(currNo[1], number);
+            }
+        }     
+    }
+}
+      
+function UpdateCondition(number){
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var f = event.target.value;
+    var objectstore = transaction.objectStore('inputs');
+    var objectStoreRequest = objectstore.get(number);
+    objectStoreRequest.onsuccess = function(){
+        var x = objectStoreRequest.result;
+        x.Condition = f;
+        var update = objectstore.put(x);
+    }
+}
+
+function UpdateConditionYN(select, number){
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var f = select.value;
+    var objectstore = transaction.objectStore('inputs');
+    var objectStoreRequest = objectstore.get(number);
+    objectStoreRequest.onsuccess = function(){
+        var x = objectStoreRequest.result;
+        x.Condition = parseInt(f);
+    var update = objectstore.put(x);                
+    }
+}
+
+function UpdateConditionType(num, parentNumber){
+    var transaction = app.db.transaction(['inputs'], 'readonly');
+    var objectstore = transaction.objectStore('inputs');
+    var objectStoreRequest = objectstore.get(parseInt(parentNumber));
+    objectStoreRequest.onsuccess = function(){
+        var insert = '<p><label>Condition</label><span>';
+        var type = objectStoreRequest.result.type;
+        var objectStoreRequestSecond = objectstore.get(parseInt(num));            
+        objectStoreRequestSecond.onsuccess = function(){
+            var typeOfCond = objectStoreRequestSecond.result.ConditionType;
+            var dspCond = objectStoreRequestSecond.result.Condition;
+            if(type == 2){
+                insert += '<input type="number" onfocusout="UpdateCondition('+num+')" value="'+dspCond+'"></select><select onchange="saveConditionType(this, '+num+')">';
+                
+                switch(parseInt(typeOfCond)){
+                    case 1:
+                        insert += '<option value="1" selected>Equals</option><option value="2">Greater than</option><option value="3">Less than</option>';
+                        break;
+                    case 2:
+                        insert += '<option value="1" selected>Equals</option><option value="2" selected>Greater than</option><option value="3">Less than</option>';
+                        break;
+                    case 3:
+                        insert += '<option value="1">Equals</option><option value="2">Greater than</option><option value="3"  selected>Less than</option>';
+                        break;
+                }            
+            }else if(type == 3){
+                if(dspCond == 2){
+                    insert += '<select onchange="UpdateConditionYN(this, '+num+')"><option disabled style="display:none;"></option><option value="1" selected>Yes</option><option value="2">No</option></select><select><option>Equals</option></select>';
+                }else if(dspCond == 1){
+                    insert += '<select onchange="UpdateConditionYN(this, '+num+')"><option disabled style="display:none;"></option><option value="1">Yes</option><option value="2" selected>No</option></select><select><option>Equals</option></select>';
+                }else{
+                    insert += '<select onchange="UpdateConditionYN(this, '+num+')"><option disabled selected style="display:none;"></option><option value="1">Yes</option><option value="2">No</option></select><select><option>Equals</option></select>';
+                }
+            }else{
+                insert += '<input onfocusout="UpdateCondition('+num+')"  value="'+dspCond+'"><select><option>Equals</option></select></span></p>';
+            }
+        
+            var p = 'sub_'+num;                    
+            document.getElementById(p).getElementsByTagName('div')[0].insertAdjacentHTML('afterbegin', insert);
+        }        
+    }
+}
+            
+function saveConditionType(select, num){
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var objectstore = transaction.objectStore('inputs');
+    var objectStoreRequest = objectstore.get(parseInt(num));
+    objectStoreRequest.onsuccess = function(){
+        var request = objectStoreRequest.result;
+        request.ConditionType = select.value;
+        var update = objectstore.put(request);
+    }
+}
+            
+function reset(){
+    var transaction = app.db.transaction(['inputs'], 'readwrite');
+    var objectstore = transaction.objectStore('inputs');
+    var objectStoreRequest = objectstore.clear();
+    objectStoreRequest.onsuccess = function(){
+        alert('Form has been cleared.');
+    }
+    document.getElementById('form').innerHTML = '';   
+}
+
+openDB();
+</script>
     </body>
 </html>
