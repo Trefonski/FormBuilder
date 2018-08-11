@@ -1,0 +1,20 @@
+{
+  "private": true,
+  "dev": "webpack-watch-server",
+  "devDependencies": {
+    "css-loader": "^1.0.0",
+    "extract-loader": "^2.0.1",
+    "extract-text-webpack-plugin": "^3.0.2",
+    "file-loader": "^1.1.11",
+    "mini-css-extract-plugin": "^0.4.1",
+    "node-sass": "^4.9.3",
+    "postcss-loader": "^3.0.0",
+    "sass-loader": "^7.1.0",
+    "style-loader": "^0.22.1",
+    "webpack": "^4.16.5"
+  },
+  "dependencies": {
+    "lodash": "^4.17.10",
+    "webpack-watch-server": "^1.2.1"
+  }
+}

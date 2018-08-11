@@ -1,0 +1,186 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" type="text/css" href="style.css">
+        <script href="style.js"></script>
+    </head>
+    
+    <body>
+        <nav>
+            <h1>Form Builder</h1>
+            <button class="nav-right button" onclick="location.href = 'FormBuilder.html';">Build Form</button>
+        </nav>
+        
+        <div id="form" class="main">
+            
+        </div>
+        
+
+        <script>
+            var app = app || {};
+            app.db = '';
+            app.counter;
+            var ElementFrame = ElementFrame || {};
+            ElementFrame.SelectType = '<select><option value="1">Text</option><option value="2">Number</option><option value="3">Yes/NO</option></select>';
+            ElementFrame.QuestionLabel = '<label>Question</label>';
+            ElementFrame.ConditionLabel = '<label>Condition</label>';
+            ElementFrame.TypeLabel = '<label>Type</label>';
+            ElementFrame.Buttons = '<button class="nav-right"';
+            var Inputs = [];
+            var SelectConditionType = '';
+            var db;
+            
+            function openDB(){
+                var DBOpenRequest = window.indexedDB.open('inputs');
+                DBOpenRequest.onerror = function(){
+                    alert('Error while opening database!');
+                }
+                DBOpenRequest.onsuccess = function(){
+                    console.log('success');
+                    app.db = DBOpenRequest.result;
+                    console.log(app.db);
+                    display();
+                };
+                DBOpenRequest.onupgradeneeded = function(event){
+                    console.log('upg');
+                    var db = event.target.result;
+                    
+                    db.onerror = function(event){
+                        alert('error');
+                    }
+                    var objectStore = db.createObjectStore('inputs', { keyPath: 'number' } );
+
+                    objectStore.createIndex('parent','parent', { unique : false } );
+                    objectStore.createIndex('InputType','InputType', { unique : false } );
+                    objectStore.createIndex('question','question', { unique : false } );
+                    objectStore.createIndex('type','type', { unique : false } );
+                    objectStore.createIndex('Condition','Condition', { unique : false } );
+                    objectStore.createIndex('ConditionType','ConditionType', { unique : false } );
+                }
+                console.log(app.db);
+            }
+            
+            function display(){
+                var db = app.db;
+                console.log(app.db);
+                var transaction = db.transaction(['inputs'], 'readonly');
+                console.log(transaction);
+                var objectstore = transaction.objectStore('inputs');
+                var request = objectstore.getAll();
+                request.onsuccess = function(){
+                    console.log(request.result);
+                    app.counter = request.result.length;
+                    
+                    var data = request.result;
+                    
+                    console.log(data.length);
+                    for(var z = 0; z < data.length; z++){
+                        var number = parseInt(data[z].number);
+                        console.log(app.counter);
+                        if(number >=app.counter){
+                            app.counter = number;
+                            console.log(app.counter);
+                        }
+                        console.log(data[z]);
+                        var is = '';
+                
+                        if(data[z].InputType == "normal"){
+                            var tag = 'input_'+number;
+                        }else if(data[z].InputType == "sub"){
+                            var tag = 'sub_'+number;
+                        }
+                        is += data[z].question+'<span>';
+                        if(data[z].type == 1){
+                            is+= '<input type="text" onkeyup="checker(this, '+number+')">';
+                        }else if(data[z].type == 2){
+                            is += '<input type="number" onkeyup="checker(this, '+number+')">';
+                        }else{
+                            is += '<input class="rd" name="radio'+number+'" type="radio" value="1" onchange="checker(this, '+number+')">Yes';
+                            is += '<input class="rd" name="radio'+number+'" type="radio" value="2" onchange="checker(this, '+number+')">No';
+                        }
+                        var element = '<div class="blockDsp ';
+                        if(data[z].InputType == "sub"){
+                            element += 'inv';
+                        }
+                        element += '" id="'+tag+'"><div class="x">'+is+'</span></div></div>';
+                        document.getElementById(data[z].parent).insertAdjacentHTML('beforeend',element);
+                    }
+                }
+                
+                
+                
+            };
+            function checker(trigger, num){
+                var transaction = app.db.transaction(['inputs'], 'readonly');
+                var objectstore = transaction.objectStore('inputs');
+                var request = objectstore.get(num);
+                request.onsuccess = function(){
+                    var list = objectstore.getAll();
+                    list.onsuccess = function(){
+                        var resultParent = request.result;
+                        var resultAll = list.result;
+                        
+                        for(var cz = 0; cz < resultAll.length; cz++){
+                            var child = resultAll[cz];
+                            if('input_'+num == child.parent || 'sub_'+num == child.parent){
+                                console.log('tu2');
+                                switch(resultParent.type){
+                                    case 1:
+                                        console.log('tu3');
+                                        if(trigger.value.toLowerCase() == child.Condition.toLowerCase()){
+                                            document.getElementById('sub_'+child.number).style.display='block';
+                                        }else{
+                                                    document.getElementById('sub_'+child.number).style.display = 'none';
+                                                }
+                                        break;
+                                    case 2:
+                                        console.log('tu3');
+                                        switch(parseInt(child.ConditionType)){
+                                            case 1:
+                                                if(trigger.value == parseInt(child.Condition)){
+                                                    console.log(trigger.value);
+                                                    document.getElementById('sub_'+child.number).style.display = 'block';
+                                                }else{
+                                                    document.getElementById('sub_'+child.number).style.display = 'none';
+                                                }
+                                                break;
+                                            case 2:
+                                                if(trigger.value > parseInt(child.Condition)){
+                                                    console.log(trigger.value);
+                                                    document.getElementById('sub_'+child.number).style.display = 'block';
+                                                }else{
+                                                    document.getElementById('sub_'+child.number).style.display = 'none';
+                                                }
+                                                break;
+                                                case 3:
+                                                if(trigger.value < parseInt(child.Condition)){
+                                                    console.log(trigger.value);
+                                                    document.getElementById('sub_'+child.number).style.display = 'block';
+                                                }else{
+                                                    document.getElementById('sub_'+child.number).style.display = 'none';
+                                                }
+                                                break;
+                                        }
+                                        break;
+                                    case 3:                                        
+                                        if(trigger.value == child.Condition){
+                                            console.log(trigger.value);
+                                            document.getElementById('sub_'+child.number).style.display = 'block';
+                                        }else{
+                                            document.getElementById('sub_'+child.number).style.display = 'none';
+                                        }
+                                        break;
+                                } 
+                            }
+                            
+                        }
+                        
+                    }
+                    
+                }
+            }
+            openDB();
+        </script>
+    </body>
+</html>
